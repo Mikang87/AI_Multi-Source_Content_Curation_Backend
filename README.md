@@ -131,6 +131,7 @@ msc-cb/
 └── requirements.txt  
 
 ## 🤝 기여자 및 라이선스
-| 백진명 | 프로젝트 리드 개발 및 설계 | Mikang87 |
-License: <MIT License>"# AI_Multi-Source_Content_Curation_Backend" 
+| 백진명 | 프로젝트 리드 개발 및 설계 | [ Mikang87](https://github.com/Mikang87) |  
+License: **MIT License**
+
 
