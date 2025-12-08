@@ -31,6 +31,7 @@
 * **구조 정리:** 설정(`config.py`, `settings.py`)과 비동기(`celery.py`) 모듈 분리 및 역할 정립.  
 
 ## 아키텍처 및 기술 스택
+
 |컴포넌트|기술 스택|사용 목적|
 |---|---|---|
 |**Web Server(API Gateway)**|**Fast API**|빠르고 비동기적인 API 엔드포인트 제공 및 Task Queue에 작업 전달 역할.|
@@ -41,8 +42,8 @@
 
 ## 핵심 데이터 모델 설계
 
-**User(사용자 관리)**  
-
+**User(사용자 관리)**
+  
 |필드|타입|설명|
 |---|---|---|
 |id|Integer(PK)|사용자 ID|
@@ -54,7 +55,7 @@
 |필드|타입|설명|
 |---|---|---|
 |id|Integer(PK)|키워드 ID|
-|user_id|Integer(FK)|키워드를 사용한 등록자|
+|user_id|integer|키워드를 사용한 등록자|
 |keyword_text|String|실제 검색에 사용할 키워드|
 
 **TaskLog(비동기 작업 로그)**  
@@ -152,5 +153,5 @@ msc-cb/
 
 ## 🤝 기여자 및 라이선스
 | 백진명 | 프로젝트 리드 개발 및 설계 | Mikang87 |
-License: <MIT License>"# AI_Multi-Source_Content_Curation_Backend" 
+License: <MIT License>
 
