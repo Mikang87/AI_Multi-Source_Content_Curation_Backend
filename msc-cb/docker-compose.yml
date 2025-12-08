@@ -4,7 +4,7 @@ services:
   web:
     build: .
     container_name: ai-curator-web
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: /bin/bash -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - .:/app
     ports:
@@ -12,8 +12,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
     restart: always
   
   db:
@@ -22,15 +24,21 @@ services:
     env_file:
       - .env
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
-      - ./grant_remote_access.sh:/docker-entrypoinst-initdb.d/grand_remote_access.sh
+      - ./grant_remote_access.sh:/docker-entrypoint-initdb.d/grant_remote_access.sh
     ports:
       - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: always
 
   redis:

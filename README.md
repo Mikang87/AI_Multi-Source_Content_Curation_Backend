@@ -12,9 +12,16 @@
 5. 최종 큐레이션 결과 조회 API.
 
 ## 현재 버전  
-**v0.0.5** | 초기 인프라(DB/Redis/Worker/Web) Docker Compose 구성 및 Celery 연결 완료.
+**v0.0.6** | **DB 환경 설정의 최종 안정화 및 비동기 마이그레이션(Alembic) 초기화.**  
 
 ---
+### ⚙️ 진행 히스토리 (2025.12.08)  
+**v0.0.6** | **DB 환경 설정 최종 안정화 및 마이그레이션 시스템 도입**  
+* **DB 연결 안정화:**  Root 및 일반 사용자 비밀번호 불일치 문제 해결 및 환경 변수 일치.  
+* **권한 스크립트 수정:**  grant_remote_access.sh 스크립트가 root 비밀번호를 올바르게 사용하도록 보장.  
+* **Alembic 초기화:**  비동기 MySQL 드라이버(aiomysql)를 사용하는 Alembic 마이그레이션 시스템 초기화 및 첫 마이그레이션 스크립트 생성.  
+* **첫 테이블 적용:**  keyword_configs 테이블에 대한 첫 마이그레이션 스크립트 생성 및 DB에 성공적으로 적용 확인.  
+
 ### ⚙️ 진행 히스토리 (2025.12.08)  
 **v0.0.5** | **초기 인프라 및 Celery 구성 완료**  
 * **Docker Compose:** MySQL, Redis, FastAPI Web, Celery Worker 4개 서비스 구성 완료.  
@@ -34,58 +41,64 @@
 
 ## 핵심 데이터 모델 설계
 
-1. **User(사용자 관리)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|사용자 ID|  
-|username|String|사용자 이름|  
-|password|String|사용자 비밀번호|   
+**User(사용자 관리)**  
 
-2. **Keyword(사용자 키워드)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|키워드 ID|  
-|user_id|integer|키워드를 사용한 등록자|  
-|keyword_text|String|실제 검색에 사용할 키워드|  
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|사용자 ID|
+|username|String|사용자 이름|
+|password|String|사용자 비밀번호|
 
-3. **TaskLog(비동기 작업 로그)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|작업 로그 ID|  
-|keyword_id|Integer(FK)|대상 키워드 ID|  
-|celery_task_id|String|Celery가 부여한 고유 작업 ID(상태조회용)|  
-|status|String|Pending, Running, Completed, Failed|  
-|requested_at|DateTime|작업 요청 시각|  
-|completed_at|DateTime|작업 완료 시작|  
+**Keyword(사용자 키워드)**  
 
-4. **RawContent(수집된 원본 데이터)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|작업 로그 ID|  
-|keyword_id|Integer(FK)|대상 키워드 ID|  
-|source_type|String|수집된 API 종류|  
-|original_url|String|원본 콘텐츠 URL|  
-|raw_text|Text|LLM에게 전달할 원본 텍스트 내용|  
-|collected_at|DateTime|수집 시각|  
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|키워드 ID|
+|user_id|Integer(FK)|키워드를 사용한 등록자|
+|keyword_text|String|실제 검색에 사용할 키워드|
 
-5. **CuratedContent(LLM이 가공한 최종 결과)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|큐레이션 결과 ID|  
-|raw_content_id|Integer(FK)|원본 콘텐츠 ID|  
-|summary_text|Text|LLM이 요약한 내용|  
-|extracted_keywords|Json/String|LLM이 추출한 주요 키워드 목록|  
-|curated_at|DateTime|가공 완료 시각|  
+**TaskLog(비동기 작업 로그)**  
+
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|작업 로그 ID|
+|keyword_id|Integer(FK)|대상 키워드 ID|
+|celery_task_id|String|Celery가 부여한 고유 작업 ID(상태조회용)|
+|status|String|Pending, Running, Completed, Failed|
+|requested_at|DateTime|작업 요청 시각|
+|completed_at|DateTime|작업 완료 시작|
+
+**RawContent(수집된 원본 데이터)**  
+
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|작업 로그 ID|
+|keyword_id|Integer(FK)|대상 키워드 ID|
+|source_type|String|수집된 API 종류|
+|original_url|String|원본 콘텐츠 URL|
+|raw_text|Text|LLM에게 전달할 원본 텍스트 내용|
+|collected_at|DateTime|수집 시각|
+
+**CuratedContent(LLM이 가공한 최종 결과)**  
+
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|큐레이션 결과 ID|
+|raw_content_id|Integer(FK)|원본 콘텐츠 ID|
+|summary_text|Text|LLM이 요약한 내용|
+|extracted_keywords|Json/String|LLM이 추출한 주요 키워드 목록|
+|curated_at|DateTime|가공 완료 시각|
 
 ## 핵심 API 엔드포인트 (FastAPI)  
 FastAPI 서버에서 처리할 주요 API 엔드포인트 정의  
-|순서|HTTP 메서드|경로|설명|주요 로직|  
-|---|---|---|---|---|  
-|1|POST|/api/v1/keywords|새로운 키워드 등록|DB Keyword 테이블에 저장|  
-|2|GET|/api/v1/keywords|등록된 키워드 목록 조회|DB Keyword 테이블 조회|  
-|3|POST|/api/v1/curation-tasks|키워드 기반 큐레이션 작업 요청|Celery에 Task를 전달하고 TaskLog에 Pending 상태로 기록, celery_task_id 반환|  
-|4|GET|/api/v1/curation-task/{task_id}|비동기 작업 상태 조회|Celery/Redis에서 task_id의 상태를 확인하고 TaskLog 테이블에서 상태 업데이트 및 반환|  
-|5|GET|/api/v1/curated-content|최종 큐레이션 결과 목록 조회|DB CuratedContent 테이블 조회(필터링, 페이징 적용)|  
+
+|순서|HTTP 메서드|경로|설명|주요 로직|
+|---|---|---|---|---|
+|1|POST|/api/v1/keywords|새로운 키워드 등록|DB Keyword 테이블에 저장|
+|2|GET|/api/v1/keywords|등록된 키워드 목록 조회|DB Keyword 테이블 조회|
+|3|POST|/api/v1/curation-tasks|키워드 기반 큐레이션 작업 요청|Celery에 Task를 전달하고 TaskLog에 Pending 상태로 기록, celery_task_id 반환|
+|4|GET|/api/v1/curation-task/{task_id}|비동기 작업 상태 조회|Celery/Redis에서 task_id의 상태를 확인하고 TaskLog 테이블에서 상태 업데이트 및 반환|
+|5|GET|/api/v1/curated-content|최종 큐레이션 결과 목록 조회|DB CuratedContent 테이블 조회(필터링, 페이징 적용)|
 
 ## 파일 구조 (도메인형 파일 구조, DDS)  
 msc-cb/  
