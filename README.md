@@ -12,9 +12,16 @@
 5. 최종 큐레이션 결과 조회 API.
 
 ## 현재 버전  
-**v0.0.5** | 초기 인프라(DB/Redis/Worker/Web) Docker Compose 구성 및 Celery 연결 완료.
+**v0.0.6** | **DB 환경 설정의 최종 안정화 및 비동기 마이그레이션(Alembic) 초기화.**  
 
 ---
+### ⚙️ 진행 히스토리 (2025.12.08)  
+**v0.0.6** | **DB 환경 설정 최종 안정화 및 마이그레이션 시스템 도입**  
+* **DB 연결 안정화:**  Root 및 일반 사용자 비밀번호 불일치 문제 해결 및 환경 변수 일치.  
+* **권한 스크립트 수정:**  grant_remote_access.sh 스크립트가 root 비밀번호를 올바르게 사용하도록 보장.  
+* **Alembic 초기화:**  비동기 MySQL 드라이버(aiomysql)를 사용하는 Alembic 마이그레이션 시스템 초기화 및 첫 마이그레이션 스크립트 생성.  
+* **첫 테이블 적용:**  keyword_configs 테이블에 대한 첫 마이그레이션 스크립트 생성 및 DB에 성공적으로 적용 확인.  
+
 ### ⚙️ 진행 히스토리 (2025.12.08)  
 **v0.0.5** | **초기 인프라 및 Celery 구성 완료**  
 * **Docker Compose:** MySQL, Redis, FastAPI Web, Celery Worker 4개 서비스 구성 완료.  
@@ -66,12 +73,12 @@
 
 |필드|타입|설명|
 |---|---|---|
-|id|Integer(PK)|작업 로그 ID|  
-|keyword_id|Integer(FK)|대상 키워드 ID|  
-|source_type|String|수집된 API 종류|  
-|original_url|String|원본 콘텐츠 URL|  
-|raw_text|Text|LLM에게 전달할 원본 텍스트 내용|  
-|collected_at|DateTime|수집 시각|  
+|id|Integer(PK)|작업 로그 ID|
+|keyword_id|Integer(FK)|대상 키워드 ID|
+|source_type|String|수집된 API 종류|
+|original_url|String|원본 콘텐츠 URL|
+|raw_text|Text|LLM에게 전달할 원본 텍스트 내용|
+|collected_at|DateTime|수집 시각|
 
 **CuratedContent(LLM이 가공한 최종 결과)**  
 
@@ -84,7 +91,7 @@
 |curated_at|DateTime|가공 완료 시각|
 
 ## 핵심 API 엔드포인트 (FastAPI)  
-FastAPI 서버에서 처리할 주요 API 엔드포인트 정의
+FastAPI 서버에서 처리할 주요 API 엔드포인트 정의  
 
 |순서|HTTP 메서드|경로|설명|주요 로직|
 |---|---|---|---|---|
@@ -146,6 +153,5 @@ msc-cb/
 
 ## 🤝 기여자 및 라이선스
 | 백진명 | 프로젝트 리드 개발 및 설계 | Mikang87 |
-License: <MIT License>"# AI_Multi-Source_Content_Curation_Backend" 
-
+License: <MIT License>
 

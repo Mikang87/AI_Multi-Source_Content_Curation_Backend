@@ -7,6 +7,7 @@ class Settings(BaseSettings):
 
     MYSQL_HOST: str = Field(..., env="MYSQL_HOST")
     MYSQL_USER: str = Field(..., env="MYSQL_USER")
+    MYSQL_ROOT_PASSWORD: str = Field(..., env="MYSQL_USER")
     MYSQL_PASSWORD: str = Field(..., env="MYSQL_PASSWORD")
     MYSQL_DATABASE: str = Field(..., env="MYSQL_DATABASE")
     
@@ -25,6 +26,6 @@ class Settings(BaseSettings):
     
     @property
     def DATABASE_URL(self) -> str:
-        return f"mysql+aiomysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}@{self.MYSQL_HOST}/{self.MYSQL_DATABASE}?client_flag=2"
+        return f"mysql+aiomysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}@{self.MYSQL_HOST}/{self.MYSQL_DATABASE}"
     
 settings = Settings()
