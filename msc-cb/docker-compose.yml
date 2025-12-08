@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    container_name: ai-curator-web
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    restart: always
+  
+  db:
+    image: mysql:8.0
+    container_name: ai-curator-db
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./grant_remote_access.sh:/docker-entrypoinst-initdb.d/grand_remote_access.sh
+    ports:
+      - "3307:3306"
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-curator-redis
+    volumes:
+      - redis_data:/data
+    env_file:
+      - .env
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}"
+    ports:
+      - "6379:6379"
+    restart: always
+
+  worker:
+    build: .
+    container_name: ai-curator-worker
+    command: celery -A app.core.celery_app worker -l info -c 1
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - web
+      - redis
+    restart: always
+
+volumes:
+  db_data:
+  redis_data:
+
+

@@ -1,0 +1,27 @@
+#FastAPI 및 ASGI 서버
+fastapi
+uvicorn
+
+#Pydantic
+pydantic
+pydantic-settings
+
+#비동기 DB
+SQLAlchemy[asyncio]
+
+#비동기 MySQL 드라이버
+pymysql
+
+#Celery 및 Redis
+celery
+redis
+
+#API 통신
+httpx
+
+#보안
+python-dotenv
+passlib[bcrypt]
+cryptography
+
+#LLM
