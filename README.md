@@ -28,7 +28,7 @@
 * **환경 변수:** `.env` 파일에 모든 서비스(DB, Redis, Celery, API Keys) 설정값 정의 및 Pydantic `Settings` 클래스를 통해 로드.  
 * **Celery 연동:** `app/core/celery_app.py`를 정의하여 Celery Worker가 Redis Broker/Backend에 연결.    
 * **FastAPI 구동:** `app/main.py`에 FastAPI 인스턴스(`app`)를 정의하여 Uvicorn이 웹 서버를 로드. (http://localhost:8000/docs 접속 가능 상태)  
-* **구조 정리: ** 설정(`config.py`, `settings.py`)과 비동기(`celery.py`) 모듈 분리 및 역할 정립.  
+* **구조 정리:** 설정(`config.py`, `settings.py`)과 비동기(`celery.py`) 모듈 분리 및 역할 정립.  
 
 ## 아키텍처 및 기술 스택
 |컴포넌트|기술 스택|사용 목적|
@@ -153,3 +153,4 @@ msc-cb/
 ## 🤝 기여자 및 라이선스
 | 백진명 | 프로젝트 리드 개발 및 설계 | Mikang87 |
 License: <MIT License>"# AI_Multi-Source_Content_Curation_Backend" 
+
