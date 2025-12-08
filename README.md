@@ -24,6 +24,7 @@
 * **구조 정리:** 설정(`config.py`, `settings.py`)과 비동기(`celery.py`) 모듈 분리 및 역할 정립.  
 
 ## 아키텍처 및 기술 스택
+
 |컴포넌트|기술 스택|사용 목적|
 |---|---|---|
 |**Web Server(API Gateway)**|**Fast API**|빠르고 비동기적인 API 엔드포인트 제공 및 Task Queue에 작업 전달 역할.|
@@ -34,33 +35,37 @@
 
 ## 핵심 데이터 모델 설계
 
-1. **User(사용자 관리)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|사용자 ID|  
-|username|String|사용자 이름|  
-|password|String|사용자 비밀번호|   
+**User(사용자 관리)**
+  
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|사용자 ID|
+|username|String|사용자 이름|
+|password|String|사용자 비밀번호|
 
-2. **Keyword(사용자 키워드)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|키워드 ID|  
-|user_id|integer|키워드를 사용한 등록자|  
-|keyword_text|String|실제 검색에 사용할 키워드|  
+**Keyword(사용자 키워드)**  
 
-3. **TaskLog(비동기 작업 로그)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|작업 로그 ID|  
-|keyword_id|Integer(FK)|대상 키워드 ID|  
-|celery_task_id|String|Celery가 부여한 고유 작업 ID(상태조회용)|  
-|status|String|Pending, Running, Completed, Failed|  
-|requested_at|DateTime|작업 요청 시각|  
-|completed_at|DateTime|작업 완료 시작|  
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|키워드 ID|
+|user_id|integer|키워드를 사용한 등록자|
+|keyword_text|String|실제 검색에 사용할 키워드|
 
-4. **RawContent(수집된 원본 데이터)**  
-|필드|타입|설명|  
-|---|---|---|  
+**TaskLog(비동기 작업 로그)**  
+
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|작업 로그 ID|
+|keyword_id|Integer(FK)|대상 키워드 ID|
+|celery_task_id|String|Celery가 부여한 고유 작업 ID(상태조회용)|
+|status|String|Pending, Running, Completed, Failed|
+|requested_at|DateTime|작업 요청 시각|
+|completed_at|DateTime|작업 완료 시작|
+
+**RawContent(수집된 원본 데이터)**  
+
+|필드|타입|설명|
+|---|---|---|
 |id|Integer(PK)|작업 로그 ID|  
 |keyword_id|Integer(FK)|대상 키워드 ID|  
 |source_type|String|수집된 API 종류|  
@@ -68,24 +73,26 @@
 |raw_text|Text|LLM에게 전달할 원본 텍스트 내용|  
 |collected_at|DateTime|수집 시각|  
 
-5. **CuratedContent(LLM이 가공한 최종 결과)**  
-|필드|타입|설명|  
-|---|---|---|  
-|id|Integer(PK)|큐레이션 결과 ID|  
-|raw_content_id|Integer(FK)|원본 콘텐츠 ID|  
-|summary_text|Text|LLM이 요약한 내용|  
-|extracted_keywords|Json/String|LLM이 추출한 주요 키워드 목록|  
-|curated_at|DateTime|가공 완료 시각|  
+**CuratedContent(LLM이 가공한 최종 결과)**  
+
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|큐레이션 결과 ID|
+|raw_content_id|Integer(FK)|원본 콘텐츠 ID|
+|summary_text|Text|LLM이 요약한 내용|
+|extracted_keywords|Json/String|LLM이 추출한 주요 키워드 목록|
+|curated_at|DateTime|가공 완료 시각|
 
 ## 핵심 API 엔드포인트 (FastAPI)  
-FastAPI 서버에서 처리할 주요 API 엔드포인트 정의  
-|순서|HTTP 메서드|경로|설명|주요 로직|  
-|---|---|---|---|---|  
-|1|POST|/api/v1/keywords|새로운 키워드 등록|DB Keyword 테이블에 저장|  
-|2|GET|/api/v1/keywords|등록된 키워드 목록 조회|DB Keyword 테이블 조회|  
-|3|POST|/api/v1/curation-tasks|키워드 기반 큐레이션 작업 요청|Celery에 Task를 전달하고 TaskLog에 Pending 상태로 기록, celery_task_id 반환|  
-|4|GET|/api/v1/curation-task/{task_id}|비동기 작업 상태 조회|Celery/Redis에서 task_id의 상태를 확인하고 TaskLog 테이블에서 상태 업데이트 및 반환|  
-|5|GET|/api/v1/curated-content|최종 큐레이션 결과 목록 조회|DB CuratedContent 테이블 조회(필터링, 페이징 적용)|  
+FastAPI 서버에서 처리할 주요 API 엔드포인트 정의
+
+|순서|HTTP 메서드|경로|설명|주요 로직|
+|---|---|---|---|---|
+|1|POST|/api/v1/keywords|새로운 키워드 등록|DB Keyword 테이블에 저장|
+|2|GET|/api/v1/keywords|등록된 키워드 목록 조회|DB Keyword 테이블 조회|
+|3|POST|/api/v1/curation-tasks|키워드 기반 큐레이션 작업 요청|Celery에 Task를 전달하고 TaskLog에 Pending 상태로 기록, celery_task_id 반환|
+|4|GET|/api/v1/curation-task/{task_id}|비동기 작업 상태 조회|Celery/Redis에서 task_id의 상태를 확인하고 TaskLog 테이블에서 상태 업데이트 및 반환|
+|5|GET|/api/v1/curated-content|최종 큐레이션 결과 목록 조회|DB CuratedContent 테이블 조회(필터링, 페이징 적용)|
 
 ## 파일 구조 (도메인형 파일 구조, DDS)  
 msc-cb/  
@@ -140,4 +147,5 @@ msc-cb/
 ## 🤝 기여자 및 라이선스
 | 백진명 | 프로젝트 리드 개발 및 설계 | Mikang87 |
 License: <MIT License>"# AI_Multi-Source_Content_Curation_Backend" 
+
 
