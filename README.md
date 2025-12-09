@@ -157,7 +157,7 @@ msc-cb/
 │    ├── versions/  
 │    │   ├── c93021f4e1bc_create_remaining_core_tables.cpython-314.pyc  
 │    │   └── f697008bd951_create_initial_keyword_table.py    
-│    └── env.py
+│    └── env.py  
 │   
 ├── alembic.ini  
 ├── grant_remote_access.sh  
@@ -169,3 +169,4 @@ msc-cb/
 ## 🤝 기여자 및 라이선스  
 | 백진명 | 프로젝트 리드 개발 및 설계 | [Mikang87] https://github.com/Mikang87 |  
 License: MIT License
+
