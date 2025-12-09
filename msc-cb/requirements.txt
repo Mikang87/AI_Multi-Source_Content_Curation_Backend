@@ -15,7 +15,6 @@ aiomysql
 #DB Migration
 alembic
 
-
 #Celery 및 Redis
 celery
 redis

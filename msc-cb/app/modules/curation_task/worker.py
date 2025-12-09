@@ -1,15 +1,119 @@
 from app.core.celery_app import celery_app
-import logging, time
+from app.core.database import AsyncSessionLocal
+from app.modules.curation_task.models import TaskLogConfig
+from app.modules.content.models import RawContentConfig, CuratedContentConfig
+from app.modules.external.collector.news_collector import NewsCollector
+from app.modules.external.processor.llm_processor import DummyLLMProcessor
+from app.core import config
+from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+import asyncio, os, logging, time
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-@celery_app.task(name="curation_tasks.start_workflow")
-def curation_workflow_task(keyword_id: int):
-    logger.info(f"Task received for keyword ID: {keyword_id}. Starting curation workflow.")
-    logger.info(f"Curation workflow completed for keyword ID: {keyword_id}.")
-    #TODO: 작업 상태 업데이트 (DB Tasklog) 로직 추가 예정
-    return {
-        "status": "SUCCESS", 
-        "message":f"Curated content generated for keyword {keyword_id}",
-        "colleted_count": 5
-    }
+async def save_raw_contents(session:AsyncSession, keyword_id:int, collected_data_list)-> List[RawContentConfig]:
+    raw_contents = [
+        RawContentConfig(
+            keyword_id=keyword_id,
+            source_type=data["source_type"],
+            original_url=data["original_url"],
+            raw_text=data["raw_text"]           
+        ) for data in collected_data_list
+    ]
+    session.add_all(raw_contents)
+    await session.commit()
+    return raw_contents
+
+async def save_curated_content(session: AsyncSession, raw_content_id: int, processed_result) -> CuratedContentConfig:
+    keywords_str = ", ".join(processed_result["extracted_keywords"])
+    
+    curated = CuratedContentConfig(
+        raw_content_id=raw_content_id,
+        summary_text=processed_result["summary_text"],
+        extracted_keywords=keywords_str,
+        curated_at=datetime.now()
+    )
+    session.add(curated)
+    await session.commit()
+    await session.refresh(curated)
+    return curated
+
+async def _run_curation_workflow(db: AsyncSession, task_log: TaskLogConfig, keyword_id: int):
+    NEWS_API_KEY = config.settings.NEWS_API_KEY
+    LLM_API_KEY = "DUMMY_LLM_KEY"
+    KEYWORD_TEXT = "AI 트렌드"
+    total_processed_count = 0
+    
+    try:
+        task_log.status = "RUNNING"
+        await db.commit()
+        
+        logger.info(f"Starting data colletion for keyword ID: {keyword_id}...")
+        
+        async with NewsCollector(api_key=NEWS_API_KEY, keyword=KEYWORD_TEXT) as collector:
+            collected_data = await collector.collect()
+            
+        if not collected_data:
+            logger.warning("No data collected. Workflow finished early.")
+            task_log.status = "SUCCESS"
+            task_log.completed_at = datetime.now()
+            await db.commit()
+            return {
+                "status": "SUCCESS",
+                "message": "No content found for the keyword"
+            }
+            
+        raw_contents = await save_raw_contents(db, keyword_id, collected_data)
+        logger.info(f"Saved {len(raw_contents)} raw content items.")
+        
+        processor = DummyLLMProcessor(api_key=LLM_API_KEY)
+        
+        for raw_item in raw_contents:
+            logger.info(f"Processing RawContent ID: {raw_item.id}...")
+            
+            processed_result = await processor.summarize_and_extract_keywords(raw_item.raw_text)
+            
+            await save_curated_content(db, raw_item.id, processed_result)
+            total_processed_count += 1
+            
+        task_log.status = "SUCCESS"
+        task_log.completed_at = datetime.now()
+        await db.commit()
+        
+        logger.info(f"Workflow successfully completed for keyword ID: {keyword_id}. Processed {total_processed_count} items.")
+        
+        return {
+            "status": "SUCCESS",
+            "message": "Curation workflow successfully completed.",
+            "collected_count": len(collected_data),
+            "processed_cound": total_processed_count
+        }
+    except Exception as e:
+        logger.error(f"Error in curation workflow for keyword ID {keyword_id}: {e}", exc_info=True)
+        task_log.status = "FAILURE"
+        task_log.completed_at = datetime.now()
+        await db.commit()
+        
+        return{
+            "status": "FAILURE",
+            "message": f"Curation workflow failed: {str(e)}"
+        }
+
+@celery_app.task(name="curation_tasks.start_workflow", bind=True)
+def curation_workflow_task(self, keyword_id: int):
+    try:
+        async def get_initial_task_log_and_db():
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(TaskLogConfig).where(TaskLogConfig.celery_task_id == self.request.id))
+                task_log = result.scalars().first()
+                if not task_log:
+                    raise Exception(f"TaskLog not fount for Celery ID: {self.request.id}")
+                return await _run_curation_workflow(db, task_log, keyword_id)
+        final_result = asyncio.run(get_initial_task_log_and_db())
+        return final_result
+    except Exception as e:
+        logger.error(f"Unhandled error during workflow execution: {e}")
+        self.update_state(state="FAILURE", meta={"message": f"Workflow failed: {str(e)}"})
+        raise
