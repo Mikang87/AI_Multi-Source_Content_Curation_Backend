@@ -4,7 +4,8 @@ from app.core.config import settings
 celery_app = Celery(
     "ai_curation_worker",
     broker=settings.CELERY_BROKER_URL,
-    backend=settings.CELERY_RESULT_BACKEND
+    backend=settings.CELERY_RESULT_BACKEND,
+    include=['app.modules.curation_task.worker']
 )
 
 celery_app.conf.update(

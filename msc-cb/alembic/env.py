@@ -13,7 +13,10 @@ sys.path = ['','..'] + sys.path
 
 from app.core.config import settings
 from app.core.database import Base
+from app.modules.user import models
 from app.modules.keywords import models
+from app.modules.content import models
+from app.modules.curation_task import models
 
 config = context.config
 
