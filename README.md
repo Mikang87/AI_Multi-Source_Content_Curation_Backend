@@ -12,15 +12,22 @@
 5. 최종 큐레이션 결과 조회 API.
 
 ## 현재 버전  
-**v0.0.6** | **DB 환경 설정의 최종 안정화 및 비동기 마이그레이션(Alembic) 초기화.**  
+**v0.0.7** | **핵심 도메인 모델 정의 및 MVP API 기초 구현.**  
 
 ---
+### ⚙️ 진행 히스토리 (2025.12.09)  
+**v0.0.7** | **핵심 도메인 모델 정의 및 MVP API 기초 구현.**  
+* **전체 DB 스키마 확정:**  `user`, `tasklog`, `rawcontent`, `curatedcontent` ORM 모델 정의 및 Alembic 마이그레이션을 통해 DB 스키마 최종 적용 완료.  
+* **키워드 관리 API 구현:**  키워드 등록/조회 (`Post /api/v1/keywords`, `Get api/v1/keywords`) API 구현.  
+* **비동기 Task 시스템 연동:**  Celery Task 요청 (`Post /api/v1/curation-tasks`) 및 상태 조회 (`GET /api/v1/curation-task/{task_id}`) API 구현.  
+* **라우터 설정:**  `app/main/py`에 `keywords` 및 `curation_task` 라우터 포함 완료.
+
 ### ⚙️ 진행 히스토리 (2025.12.08)  
 **v0.0.6** | **DB 환경 설정 최종 안정화 및 마이그레이션 시스템 도입**  
 * **DB 연결 안정화:**  Root 및 일반 사용자 비밀번호 불일치 문제 해결 및 환경 변수 일치.  
 * **권한 스크립트 수정:**  grant_remote_access.sh 스크립트가 root 비밀번호를 올바르게 사용하도록 보장.  
 * **Alembic 초기화:**  비동기 MySQL 드라이버(aiomysql)를 사용하는 Alembic 마이그레이션 시스템 초기화 및 첫 마이그레이션 스크립트 생성.  
-* **첫 테이블 적용:**  keyword_configs 테이블에 대한 첫 마이그레이션 스크립트 생성 및 DB에 성공적으로 적용 확인.  
+* **첫 테이블 적용:**  `keyword` 테이블에 대한 첫 마이그레이션 스크립트 생성 및 DB에 성공적으로 적용 확인.  
 
 ### ⚙️ 진행 히스토리 (2025.12.08)  
 **v0.0.5** | **초기 인프라 및 Celery 구성 완료**  
@@ -31,7 +38,6 @@
 * **구조 정리:** 설정(`config.py`, `settings.py`)과 비동기(`celery.py`) 모듈 분리 및 역할 정립.  
 
 ## 아키텍처 및 기술 스택
-
 |컴포넌트|기술 스택|사용 목적|
 |---|---|---|
 |**Web Server(API Gateway)**|**Fast API**|빠르고 비동기적인 API 엔드포인트 제공 및 Task Queue에 작업 전달 역할.|
@@ -42,8 +48,8 @@
 
 ## 핵심 데이터 모델 설계
 
-**User(사용자 관리)**
-  
+**User(사용자 관리)**  
+
 |필드|타입|설명|
 |---|---|---|
 |id|Integer(PK)|사용자 ID|
@@ -55,7 +61,7 @@
 |필드|타입|설명|
 |---|---|---|
 |id|Integer(PK)|키워드 ID|
-|user_id|integer|키워드를 사용한 등록자|
+|user_id|Integer(FK)|키워드를 사용한 등록자|
 |keyword_text|String|실제 검색에 사용할 키워드|
 
 **TaskLog(비동기 작업 로그)**  
@@ -112,6 +118,7 @@ msc-cb/
 │   │   └── settings.py              # 환경 변수 Pydantic 설정  
 │   │  
 │   ├── modules/                     # 핵심 도메인 모듈  
+│   │   ├── __init__.py  
 │   │   ├── user/                    # 1. 사용자 관리 도메인 (비밀번호 해싱 적용)  
 │   │   │   ├── api.py               # 유저 인증/CRUD 라우터  
 │   │   │   ├── models.py            # User ORM 모델  
@@ -119,6 +126,7 @@ msc-cb/
 │   │   │   └── service.py           # 유저 생성 시 security.get_password_hash() 사용  
 │   │   │  
 │   │   ├── keywords/                # 2. 키워드 관리 도메인 (API Key 직접 노출 없음)  
+│   │   │   ├── __init__.py  
 │   │   │   ├── api.py               # 키워드 CRUD 및 큐레이션 요청 API  
 │   │   │   ├── models.py            # Keyword ORM 모델 (API Keys는 여기에 저장될 수 있음 - 암호화된 상태)  
 │   │   │   ├── schemas.py           # Keyword Pydantic 스키마  
@@ -127,6 +135,7 @@ msc-cb/
 │   │   ├── curation_task/           # 3. 큐레이션 작업 도메인 (비동기 처리 로직)  
 │   │   │   ├── api.py               # Task 요청 및 상태 조회 라우터  
 │   │   │   ├── models.py            # TaskLog ORM 모델  
+│   │   │   ├── service.py           # Celery 상태 조회 및 TaskLog 업데이트
 │   │   │   ├── schemas.py           # Task 요청/응답 스키마  
 │   │   │   └── worker.py            # Celery Task 정의 및 실행 (Service에서 받은 암호화된 키를 worker 내에서 복호화 후 사용)  
 │   │   │  
@@ -143,15 +152,21 @@ msc-cb/
 │   │           └── llm_processor.py  
 │   │  
 │   └── main.py                      # FastAPI 애플리케이션 엔트리 포인트  
-│
-├── alembic/   
+│  
+├── alembic/  
+│    ├── versions/  
+│    │   ├── c93021f4e1bc_create_remaining_core_tables.cpython-314.pyc  
+│    │   └── f697008bd951_create_initial_keyword_table.py    
 │    └── env.py  
+│   
 ├── alembic.ini  
+├── grant_remote_access.sh  
 ├── docker-compose.yml  
+├── Dockerfile  
 ├── .env    
 └── requirements.txt  
 
-## 🤝 기여자 및 라이선스
-| 백진명 | 프로젝트 리드 개발 및 설계 | Mikang87 |
-License: <MIT License>
+## 🤝 기여자 및 라이선스  
+| 백진명 | 프로젝트 리드 개발 및 설계 | [Mikang87] https://github.com/Mikang87 |  
+License: MIT License
 
