@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
+from app.core.auth import get_current_user_id
 from app.modules.keywords import service, schemas
 from typing import List
 
@@ -14,10 +15,9 @@ router = APIRouter()
 )
 async def register_new_keyword(
     keyword_in: schemas.KeywordCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
 ):
-    #TODO: User 인증 로직 추가 후 하드코딩 대체
-    current_user_id = 1
     new_keyword = await service.create_keyword(db, keyword_in, current_user_id)
     return new_keyword
 
@@ -27,9 +27,8 @@ async def register_new_keyword(
     summary="등록된 키워드 목록 조회"
 )
 async def list_keywords(
-    db: AsyncSession=Depends(get_db)
+    db: AsyncSession=Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
 ):
-    #TODO: User 인증 로직 추가 후 하드코딩 대체
-    current_user_id = 1
     keywords = await service.get_keywords(db, current_user_id)
     return keywords
