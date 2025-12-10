@@ -15,7 +15,6 @@ aiomysql
 #DB Migration
 alembic
 
-
 #Celery 및 Redis
 celery
 redis
@@ -25,7 +24,11 @@ httpx
 
 #보안
 python-dotenv
-passlib[bcrypt]
+passlib==1.7.4
 cryptography
+python-jose==3.3.0
 
 #LLM
+
+#ETC
+python-multipart

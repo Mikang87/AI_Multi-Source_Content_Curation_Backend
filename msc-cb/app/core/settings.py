@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     APP_ENV: str = Field(..., env="APP_ENV")
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
+    ALGORITHM: str = Field(..., env="ALGORITHM")
 
     MYSQL_HOST: str = Field(..., env="MYSQL_HOST")
     MYSQL_USER: str = Field(..., env="MYSQL_USER")
