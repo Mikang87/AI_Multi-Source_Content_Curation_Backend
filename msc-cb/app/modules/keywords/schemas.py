@@ -11,3 +11,10 @@ class KeywordResponse(BaseModel):
     id: int
     user_id: int
     keyword_text: str
+
+class KeywordUpdate(BaseModel):
+    keyword_text: str
+
+class KeywordDelete(BaseModel):
+    message: str = "Keyword succesfully deleted."
+    id: int

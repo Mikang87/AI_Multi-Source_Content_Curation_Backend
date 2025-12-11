@@ -12,9 +12,16 @@
 5. 최종 큐레이션 결과 조회 API.
 
 ## 현재 버전  
-**v0.0.9** | **비동기 워크플로우 안정화 및 핵심 API 최종 점검.**  
+**v0.0.10** | **DB 무결성 및 페이징 안정화.**  
 
 ---
+## ⚙️ 진행 히스토리 (2025.12.11)  
+**v0.0.10**  
+* **DB 무결성 강화:** SQLAlchemy의 외래 키 제약 조건 위반 오류 해결.  
++ Keywordconfig와 RawContentConfig, TaskLogConfig 모델의 관계에 cascade="all, delete-orphan" 옵션을 추가해 부모 항목 삭제 시 연결된 자식 항목도 연쇄적으로 삭제되도록 설정.  
++ RawContentConfig와 CuratedContentConfig 모델의 관계에도 동일한 옵션을 추가하여 데이터베이스의 무결성을 확보하고 삭제 로직을 안정화.
+* **API 페이징 로직 수정 및 안정화:**  필터링과 페이징을 포함한 조회 서비스 로직 구현.
+
 ## ⚙️ 진행 히스토리 (2025.12.10)  
 **v0.0.9**  
 * **Celery 워크플로우 안정화 (Critical Fix):** DB 트랜잭션 Race Condition으로 인한 `TaskLog not found` 에러 해결. Web Service의 DB Commit 후 Worker가 데이터를 읽을 수 있도록 비동기 딜레이(`asyncio.sleep(0.05)`)를 `worker.py`에 적용하여 안정성 확보.  
