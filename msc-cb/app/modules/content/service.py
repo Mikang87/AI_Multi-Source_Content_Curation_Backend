@@ -1,20 +1,38 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import join
+from sqlalchemy import join, func
 from app.modules.content.models import CuratedContentConfig, RawContentConfig
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
-async def get_curated_contents(db: AsyncSession, keyword_id: Optional[int] = None) ->List[Dict]:
-    stmt = (
-        select(CuratedContentConfig, RawContentConfig.original_url, RawContentConfig.source_type).select_from(
-            join(CuratedContentConfig, RawContentConfig, CuratedContentConfig.raw_content_id == RawContentConfig.id)
-        )
+async def get_curated_contents(
+    db: AsyncSession, 
+    keyword_id: Optional[int] = None,
+    page: int=1,
+    size: int=20,
+) -> Tuple[List[Dict], int]:
+    base_join = join(CuratedContentConfig, RawContentConfig, CuratedContentConfig.raw_content_id== RawContentConfig.id)
+    
+    count_stmt = (
+        select(func.count(CuratedContentConfig.id)).select_from(base_join)
     )
     
     if keyword_id is not None:
-        stmt = stmt.where(RawContentConfig.keyword_id == keyword_id)
+        count_stmt = count_stmt.where(RawContentConfig.keyword_id == keyword_id)
     
-    stmt = stmt.order_by(CuratedContentConfig.curated_at.desc())
+    total_count_reslut = await db.execute(count_stmt)
+    total_count = total_count_reslut.scalar_one()
+    
+    data_stmt = (
+        select(CuratedContentConfig, RawContentConfig.original_url, RawContentConfig.source_type)
+        .select_from(base_join)
+    )
+    
+    if keyword_id is not None:
+        data_stmt = data_stmt.where(RawContentConfig.keyword_id == keyword_id)
+        
+    offset = (page-1)*size
+    stmt = data_stmt.order_by(CuratedContentConfig.curated_at.desc()).limit(size).offset(offset)
+    
     result = await db.execute(stmt)
     
     curated_list = []
@@ -31,4 +49,5 @@ async def get_curated_contents(db: AsyncSession, keyword_id: Optional[int] = Non
             "original_url": url,
             "source_type": source_type
         })
-    return curated_list
+    return curated_list, total_count
+
