@@ -12,9 +12,18 @@
 5. 최종 큐레이션 결과 조회 API.
 
 ## 현재 버전  
-**v0.0.10** | **DB 무결성 및 페이징 안정화.**  
+**v0.1.0** | **게임 리뷰 도메인 확장.**  
 
----
+---  
+## ⚙️ 진행 히스토리 (2025.12.18)  
+**v0.1.0**  
+* **LLM 모델 변경:**  gemini-3-pro-preview에서 llama3 모델로 변경   
+* **게임 리뷰 모듈 추가:**   
++ 게임 리뷰 전용 DB 모델(GameReviewConfig, CuratedGameReviewConfig) 설계 및 DB(game_reviews, curated_game_reviews) 반영.   
++ Steam API 연동을 위한 SteamCollector 구현 (AppID 자동 검색 기능 포함).  
+* **LLM 프로세서 최적화:**
++ 뉴스용(OllamaLLMProcessor)과 리뷰용(OllamaReviewProcessor) 분리 및 특화된 프롬프트 적용.  
+
 ## ⚙️ 진행 히스토리 (2025.12.11)  
 **v0.0.10**  
 * **DB 무결성 강화:** SQLAlchemy의 외래 키 제약 조건 위반 오류 해결.  
@@ -113,6 +122,26 @@
 |raw_content_id|Integer(FK)|원본 콘텐츠 ID|
 |summary_text|Text|LLM이 요약한 내용|
 |extracted_keywords|Json/String|LLM이 추출한 주요 키워드 목록|
+|curated_at|DateTime|가공 완료 시각|  
+
+**GameReviews(게임리뷰 저장)**  
+
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|게임리뷰 결과 ID|
+|keyword_id|Integer(FK)|키워드 ID|
+|source|String(50)|수집 API 소스|
+|language|String(50)|사용 언어|
+|review_text|Text|리뷰 원문|
+|created_at|DateTime|수집 완료 시각|
+
+**CuratedGameReviews(LLM이 가공한 게임리뷰)**  
+
+|필드|타입|설명|
+|---|---|---|
+|id|Integer(PK)|큐레이션 결과 ID|
+|game_review_id|Integer(FK)|원본 리뷰 ID|
+|summary_text|Text|LLM이 요약한 내용|
 |curated_at|DateTime|가공 완료 시각|
 
 ## 핵심 API 엔드포인트 (FastAPI)  
@@ -164,20 +193,29 @@ msc-cb/
 │   │   │   ├── schemas.py           # Content Pydantic 스키마  
 │   │   │   └── service.py           # 데이터 조회 및 필터링 로직  
 │   │   │  
-│   │   └── external/                # 5. 외부 연동 도메인 (Collector 및 LLM)  
+│   │   ├── game_reviews/            # 5. 게임 리뷰 큐레이션 결과 도메인  
+│   │   │   ├── api.py               # 게임 리뷰 조회 라우터  
+│   │   │   ├── models.py            # GameReview, CuratedGameReview ORM 모델
+│   │   │   ├── schemas.py           # 게임 리뷰 Pydantic 스키마  
+│   │   │   └── service.py           # 데이터 조회 및 필터링 로직  
+│   │   │
+│   │   └── external/                # 6. 외부 연동 도메인 (Collector 및 LLM)  
 │   │       ├── collector/           # 외부 데이터 수집 (Raw Data)  
 │   │       │   ├── base_collector.py       # 컬렉터의 기반이 되는 추상 클래스  
-│   │       │   └── news_collector.py  
+│   │       │   ├── news_collector.py  
+│   │       │   └── steam_collector.py  
 │   │       │  
 │   │       └── processor/           # LLM 기반 데이터 처리 (요약/추출)  
 │   │           ├── base_llm_processor.py   #  LLM 모델 교체 용이성을 위한 추상 클래스  
-│   │           └── llm_processor.py        #  
+│   │           ├── ollama_processor.py          
+│   │           └── ollama_review_processor.py  
 │   │  
 │   └── main.py                      # FastAPI 애플리케이션 엔트리 포인트  
 │  
 ├── alembic/  
 │    ├── versions/  
-│    │   ├── c93021f4e1bc_create_remaining_core_tables.cpython-314.pyc  
+│    │   ├── c93021f4e1bc_create_remaining_core_tables.cpython-314.pyc 
+│    │   ├── 2db0e5490f19_create_game_review_tables.py   
 │    │   └── f697008bd951_create_initial_keyword_table.py    
 │    └── env.py  
 │   

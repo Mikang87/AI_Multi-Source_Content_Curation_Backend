@@ -1,0 +1,119 @@
+services:
+  web:
+    build: .
+    container_name: ai-curator-web
+    command: /bin/bash -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    networks:
+      - ai-curator-network
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+    restart: always
+  
+  db:
+    image: mysql:8.0
+    container_name: ai-curator-db
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./grant_remote_access.sh:/docker-entrypoint-initdb.d/grant_remote_access.sh
+    networks:
+      - ai-curator-network
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-curator-redis
+    volumes:
+      - redis_data:/data
+    env_file:
+      - .env
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}"
+    networks:
+      - ai-curator-network
+    ports:
+      - "6379:6379"
+    restart: always
+
+  worker:
+    build: .
+    container_name: ai-curator-worker
+    command: celery -A app.core.celery_app worker -l info -c 1
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - web
+      - redis
+      - ollama
+    networks:
+      - ai-curator-network
+    restart: always
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    entrypoint: /bin/sh
+    command: >
+      -c "\
+      /usr/bin/ollama serve & \
+      sleep 10; \
+      \
+      /usr/bin/ollama pull ${OLLAMA_LLM_MODEL}; \
+      \
+      wait \
+      "
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment: 
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_LLM_MODEL=${OLLAMA_LLM_MODEL}
+      - OLLAMA_KEEP_ALIVE=0s
+      - OLLAMA_FLASH_ATTENTION=false 
+      - OLLAMA_MAIN_GPU=-1        
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ai-curator-network
+    restart: always
+
+networks:
+  ai-curator-network:
+    driver: bridge
+
+volumes:
+  db_data:
+  redis_data:
+  ollama_data:
+
+
