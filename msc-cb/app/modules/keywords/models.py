@@ -20,3 +20,9 @@ class KeywordConfig(Base):
         back_populates="keyword",
         cascade="all, delete-orphan"
     )
+    
+    game_reviews = relationship(
+        "GameReviewConfig",
+        back_populates="keyword",
+        cascade="all, delete-orphan"
+    )

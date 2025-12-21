@@ -3,8 +3,11 @@ from app.core.database import AsyncSessionLocal
 from app.modules.curation_task.models import TaskLogConfig
 from app.modules.keywords.models import KeywordConfig # KeywordConfig 임포트 확인
 from app.modules.content.models import RawContentConfig, CuratedContentConfig
+from app.modules.game_reviews.models import GameReviewConfig, CuratedGameReviewConfig
 from app.modules.external.collector.news_collector import NewsCollector
-from app.modules.external.processor.llm_processor import DummyLLMProcessor
+from app.modules.external.collector.steam_collector import SteamCollector
+from app.modules.external.processor.ollama_processor import OllamaLLMProcessor
+from app.modules.external.processor.ollama_review_processor import OllamaReviewProcessor
 from app.core import config
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +46,6 @@ async def save_curated_content(session: AsyncSession, raw_content_id: int, proce
 
 async def _run_curation_workflow(db: AsyncSession, task_log: TaskLogConfig, keyword_id: int, keyword_text: str):
     NEWS_API_KEY = config.settings.NEWS_API_KEY
-    LLM_API_KEY = "DUMMY_LLM_KEY"
     total_processed_count = 0
     
     try:
@@ -68,7 +70,7 @@ async def _run_curation_workflow(db: AsyncSession, task_log: TaskLogConfig, keyw
         raw_contents = await save_raw_contents(db, keyword_id, collected_data)
         logger.info(f"Saved {len(raw_contents)} raw content items.")
         
-        processor = DummyLLMProcessor(api_key=LLM_API_KEY)
+        processor = OllamaLLMProcessor()
         
         for raw_item in raw_contents:
             logger.info(f"Processing RawContent ID: {raw_item.id}...")
@@ -119,6 +121,121 @@ def curation_workflow_task(self, keyword_id: int):
                     raise Exception(f"Keyword not found for ID: {keyword_id}")
                 
                 return await _run_curation_workflow(db, task_log, keyword_id, keyword.keyword_text)
+                
+        final_result = asyncio.run(get_initial_task_log_and_db())
+        return final_result
+    except Exception as e:
+        logger.error(f"Unhandled critical error during workflow execution: {e}", exc_info=True)
+        
+        return {
+            "status": "FAILURE",
+            "message": f"CRITICAL: Unhandled Celery/Asyncio initialization error. Type: {e.__class__.__name__}: {str(e)}"
+        }
+        
+async def save_raw_game_reviews(session: AsyncSession, keyword_id: int, collected_data_list) -> List[GameReviewConfig]:
+    reviews = [
+        GameReviewConfig(
+            keyword_id=keyword_id,
+            source=data["source_type"],
+            language=data["language"],
+            review_text=data["review_text"]
+            
+        ) for data in collected_data_list
+    ]
+    
+    session.add_all(reviews)
+    await session.commit()
+    return reviews
+
+async def save_curated_game_reviews(session: AsyncSession, game_review_id: int, processed_result) -> CuratedGameReviewConfig:
+    
+    curated = CuratedGameReviewConfig(
+        game_review_id=game_review_id,
+        summary_text=processed_result["summary_text"],
+        curated_at=datetime.now()
+    )
+    
+    session.add(curated)
+    await session.commit()
+    await session.refresh(curated)
+    return curated
+
+async def _run_game_review_curation_workflow(db: AsyncSession, task_log: TaskLogConfig, keyword_id: int, keyword_text: str):
+    total_processed_count = 0
+    
+    try:
+        task_log.status = "RUNNING"
+        await db.commit()
+        
+        logger.info(f"Starting data colletion for keyword ID: {keyword_id} with text: {keyword_text}...")
+        
+        async with SteamCollector(api_key=None, keyword=keyword_text) as collector:
+            collected_data = await collector.collect()
+            
+        if not collected_data:
+            logger.warning("No data collected. Workflow finished early.")
+            task_log.status = "SUCCESS"
+            task_log.completed_at = datetime.now()
+            await db.commit()
+            return {
+                "status": "SUCCESS",
+                "message": "No content found for the keyword"
+            }
+            
+        raw_contents = await save_raw_game_reviews(db, keyword_id, collected_data)
+        logger.info(f"Saved {len(raw_contents)} raw content items.")
+        
+        processor = OllamaReviewProcessor()
+        
+        for raw_item in raw_contents:
+            logger.info(f"Processing RawContent ID: {raw_item.id}...")
+            
+            processed_result = await processor.summarize_and_extract_keywords(raw_item.review_text)
+            
+            await save_curated_game_reviews(db, raw_item.id, processed_result)
+            total_processed_count += 1
+            
+        task_log.status = "SUCCESS"
+        task_log.completed_at = datetime.now()
+        await db.commit()
+        
+        logger.info(f"Workflow successfully completed for keyword ID: {keyword_id}. Processed {total_processed_count} items.")
+        
+        return {
+            "status": "SUCCESS",
+            "message": "Curation workflow successfully completed.",
+            "collected_count": len(collected_data),
+            "processed_cound": total_processed_count
+        }
+    except Exception as e:
+        logger.error(f"Error in curation workflow for keyword ID {keyword_id}: {e}", exc_info=True)
+        await db.rollback()
+        task_log.status = "FAILURE"
+        task_log.completed_at = datetime.now()
+        await db.commit()
+        
+        return {
+            "status": "FAILURE",
+            "message": f"Curation workflow failed: {e.__class__.__name__}: {e}"
+        }
+
+@celery_app.task(name="game_review_curation_tasks.start_workflow", bind=True)
+def game_review_curation_workflow_task(self, keyword_id: int):
+    try:
+        async def get_initial_task_log_and_db():
+            async with AsyncSessionLocal() as db:
+                await asyncio.sleep(0.05)
+                result_log = await db.execute(select(TaskLogConfig).where(TaskLogConfig.celery_task_id == self.request.id))
+                task_log = result_log.scalars().first()
+                if not task_log:
+                    raise Exception(f"TaskLog not found for Celery ID: {self.request.id}")
+                
+                result_keyword = await db.execute(select(KeywordConfig).where(KeywordConfig.id == keyword_id))
+                keyword = result_keyword.scalars().first()
+                if not keyword:
+                    raise Exception(f"Keyword not found for ID: {keyword_id}")
+                
+                return await _run_game_review_curation_workflow(db, task_log, keyword_id, keyword.keyword_text)
                 
         final_result = asyncio.run(get_initial_task_log_and_db())
         return final_result

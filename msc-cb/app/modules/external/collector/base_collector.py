@@ -1,6 +1,6 @@
 import httpx
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class CollectedData(Dict):
     source_type: str
@@ -8,7 +8,7 @@ class CollectedData(Dict):
     raw_text: str
 
 class BaseCollector(ABC):
-    def __init__(self, api_key:str, keyword: str):
+    def __init__(self, keyword: str, api_key: Optional[str]=None):
         self.api_key = api_key
         self.keyword = keyword
         self.client = httpx.AsyncClient(timeout=15.0)

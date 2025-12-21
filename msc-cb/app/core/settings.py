@@ -17,11 +17,9 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = Field(..., env="CELERY_BROKER_URL")
     CELERY_RESULT_BACKEND: str = Field(..., env="CELERY_RESULT_BACKEND")
     
-    OPENAI_API_KEY: str = Field(..., env="OPENAI_API_KEY")
+    OLLAMA_API_URL: str = Field(..., env="OLLAMA_API_URL")
+    OLLAMA_LLM_MODEL: str = Field(..., env="OLLAMA_LLM_MODEL")
     NEWS_API_KEY: str = Field(..., env="NEWS_API_KEY")
-    REDDIT_CLIENT_ID: str = Field(..., env="REDDIT_CLIENT_ID")
-    REDDIT_CLIENT_SECRET: str = Field(..., env="REDDIT_CLIENT_SECRET")
-    GITHUB_PAT_TOKEN: str = Field(..., env="GITHUB_PAT_TOKEN")
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     
