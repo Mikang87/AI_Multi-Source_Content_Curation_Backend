@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   web:
     build: .
@@ -11,6 +9,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    networks:
+      - ai-curator-network
     depends_on:
       redis:
         condition: service_started
@@ -31,6 +31,8 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - ./grant_remote_access.sh:/docker-entrypoint-initdb.d/grant_remote_access.sh
+    networks:
+      - ai-curator-network
     ports:
       - "3307:3306"
     healthcheck:
@@ -49,6 +51,8 @@ services:
     env_file:
       - .env
     command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}"
+    networks:
+      - ai-curator-network
     ports:
       - "6379:6379"
     restart: always
@@ -64,10 +68,52 @@ services:
     depends_on:
       - web
       - redis
+      - ollama
+    networks:
+      - ai-curator-network
     restart: always
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    entrypoint: /bin/sh
+    command: >
+      -c "\
+      /usr/bin/ollama serve & \
+      sleep 10; \
+      \
+      /usr/bin/ollama pull ${OLLAMA_LLM_MODEL}; \
+      \
+      wait \
+      "
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment: 
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_LLM_MODEL=${OLLAMA_LLM_MODEL}
+      - OLLAMA_KEEP_ALIVE=0s
+      - OLLAMA_FLASH_ATTENTION=false 
+      - OLLAMA_MAIN_GPU=-1        
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ai-curator-network
+    restart: always
+
+networks:
+  ai-curator-network:
+    driver: bridge
 
 volumes:
   db_data:
   redis_data:
+  ollama_data:
 
 

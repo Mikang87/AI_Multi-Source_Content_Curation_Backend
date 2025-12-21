@@ -21,7 +21,7 @@
 * **게임 리뷰 모듈 추가:**   
 + 게임 리뷰 전용 DB 모델(GameReviewConfig, CuratedGameReviewConfig) 설계 및 DB(game_reviews, curated_game_reviews) 반영.   
 + Steam API 연동을 위한 SteamCollector 구현 (AppID 자동 검색 기능 포함).  
-* **LLM 프로세서 최적화:**
+* **LLM 프로세서 추가:**
 + 뉴스용(OllamaLLMProcessor)과 리뷰용(OllamaReviewProcessor) 분리 및 특화된 프롬프트 적용.  
 
 ## ⚙️ 진행 히스토리 (2025.12.11)  
@@ -160,6 +160,7 @@ msc-cb/
 ├── app/  
 │   ├── core/    
 │   │   ├── database.py              # DB 세션 및 Engine  
+│   │   ├── auth.py                  # OAuth2PasswordBearer, JWT 기반의 인증 로직 
 │   │   ├── security.py              # 비밀번호 해싱 및 API Key 암호화/복호화 함수  
 │   │   ├── celery_app.py            # Celery Worker의 Redis Broker/Backend 연결 설정  
 │   │   ├── config.py                # 전역 변수 설정  
